@@ -1,0 +1,23 @@
+server:
+  port: 8080
+
+spring:
+  application:
+    name: smarthome
+  datasource:
+    driver-class-name: com.kingbase8.Driver
+    #Todo 配置自己的数据库
+    url: jdbc:kingbase8://localhost:54321/test?currentSchema=public&characterEncoding=UTF-8&clientEncoding=UTF-8
+    username: root
+    password: Ljk123456789..
+    hikari:
+      max-lifetime: 1800000
+      idle-timeout: 600000
+mybatis:
+  mapper-locations: classpath:mapper/*Mapper.xml
+  type-aliases-package: com.smarthome.pojo
+logging:
+  level:
+    com:
+      sias:
+        dao: debug
