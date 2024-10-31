@@ -1,22 +1,31 @@
 package com.hmall.smarthome.server.impl;
 
+import com.baomidou.mybatisplus.core.conditions.Wrapper;
+import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
 import com.google.gson.Gson;
 import com.google.gson.JsonArray;
+import com.google.gson.JsonElement;
 import com.google.gson.JsonObject;
 import com.hmall.smarthome.config.IotConfig;
+import com.hmall.smarthome.entry.pojo.Rooms;
 import com.hmall.smarthome.entry.vo.DeviceVO;
+import com.hmall.smarthome.entry.vo.TopVO;
+import com.hmall.smarthome.interceptor.AuthInterceptor;
+import com.hmall.smarthome.mapper.RoomsMapper;
 import com.hmall.smarthome.server.IotService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import okhttp3.*;
 import org.json.JSONArray;
 import org.json.JSONObject;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
 
 @Slf4j
 @Service
@@ -27,47 +36,80 @@ public class IotServiceImpl implements IotService {
     private final IotConfig iotconfig;
     private final Gson gson;
 
+    private final RoomsMapper roomsMapper;
+
+    private OkHttpClient client;
+
+    @Autowired
+    public IotServiceImpl(IotConfig iotConfig, RoomsMapper roomsMapper, Gson gson) {
+        this.iotconfig = iotConfig;
+        this.roomsMapper = roomsMapper;
+        this.gson = gson;
+
+        // 初始化 OkHttpClient，并添加拦截器
+        this.client = new OkHttpClient.Builder()
+                .addInterceptor(new AuthInterceptor(iotConfig, this))
+                .build();
+    }
+
+    @Override
+    public List<TopVO> getTop(String room) {
+        QueryWrapper<Rooms> queryWrapper = new QueryWrapper<>();
+        queryWrapper.eq("room_name",room);
+        List<Rooms> rooms = roomsMapper.selectList(queryWrapper);
+
+        if(!rooms.isEmpty()){
+            List<TopVO> topVOS = new ArrayList<>();
+            for(Rooms room1 : rooms){
+                TopVO topVO = new TopVO();
+                topVO.setDevid(room1.getDeviceId());
+                JsonObject json = getDeviceInfo(room1.getDeviceId());
+                JsonObject properties = json.getAsJsonObject("reported")
+                        .getAsJsonObject("properties");
+
+                if (properties != null) {
+                    for (Map.Entry<String, JsonElement> entry : properties.entrySet()) {
+                        topVO.setMsg(entry.getKey());           // 设置动态的键
+                        topVO.setMsgdata(entry.getValue().getAsString());  // 设置对应的值
+                    }
+                }
+
+                topVOS.add(topVO);
+            }
+            return topVOS;
+        }
+        return null;
+    }
+
     @Override
     public List<DeviceVO> getList() {
         List<DeviceVO> deviceVOS = new ArrayList<>();
 
-        OkHttpClient client = new OkHttpClient.Builder().build();
-
         String url = "https://" + iotconfig.getEndpoint() + "/v5/iot/" + iotconfig.getProjectid() + "/devices";
         log.info(url);
 
-        boolean flag = true;
-        while (true) {
-            Request request = new Request.Builder()
-                    .url(url)
-                    .addHeader("X-Auth-Token", iotconfig.getToken()) // 确保添加 Authorization 头
-                    .build();
+        Request request = new Request.Builder()
+                .url(url)
+                .addHeader("X-Auth-Token", iotconfig.getToken()) // 确保添加 Authorization 头
+                .build();
 
-            try (Response response = client.newCall(request).execute()) {
-                if (response.isSuccessful()) {
-                    String jsonData = response.body().string();
-                    JsonObject jsonObject = gson.fromJson(jsonData, JsonObject.class);
-                    JsonArray devicesArray = jsonObject.getAsJsonArray("devices");
-                    log.info("设备列表：" + devicesArray);
+        try (Response response = client.newCall(request).execute()) {
+            if (response.isSuccessful()) {
+                String jsonData = response.body().string();
+                JsonObject jsonObject = gson.fromJson(jsonData, JsonObject.class);
+                JsonArray devicesArray = jsonObject.getAsJsonArray("devices");
+                log.info("设备列表：" + devicesArray);
 
-                    // 将 JSON 数组转换为 Device 对象列表
-                    for (int i = 0; i < devicesArray.size(); i++) {
-                        DeviceVO device = gson.fromJson(devicesArray.get(i), DeviceVO.class);
-                        deviceVOS.add(device);
-                    }
-                    break;
-                } else if (response.code() == 401 && flag) {
-                    log.info("token过期");
-                    iotconfig.setToken(getToken()); // 更新 token
-                    flag = false;
-                } else {
-                    String errorMessage = response.body() != null ? response.body().string() : "无返回信息";
-                    log.info("请求失败，状态码：" + response.code() + "，错误信息：" + errorMessage);
-                    break;
+                for (int i = 0; i < devicesArray.size(); i++) {
+                    DeviceVO device = gson.fromJson(devicesArray.get(i), DeviceVO.class);
+                    deviceVOS.add(device);
                 }
-            } catch (Exception e) {
-                log.info(e.toString());
+            } else  {
+                String errorMessage = response.body() != null ? response.body().string() : "无返回信息";
+                log.info("请求失败，状态码：" + response.code() + "，错误信息：" + errorMessage);
             }
+        } catch (Exception e) {
+            log.info(e.toString());
         }
         return deviceVOS;
     }
@@ -120,5 +162,31 @@ public class IotServiceImpl implements IotService {
         }
 
         return token;
+    }
+
+    @Override
+    public JsonObject getDeviceInfo(String deviceId) {
+        String url = "https://" + iotconfig.getEndpoint() + "/v5/iot/" + iotconfig.getProjectid() + "/devices/" + deviceId + "/shadow";
+        log.info(url);
+
+        Request request = new Request.Builder()
+                .url(url)
+                .build();
+        try (Response response = client.newCall(request).execute()) {
+            if (response.isSuccessful()) {
+                String jsonData = response.body().string();
+                JsonObject jsonObject = gson.fromJson(jsonData, JsonObject.class);
+                JsonArray devicesArray = jsonObject.getAsJsonArray("shadow");
+                log.info("设备影子数据：" + devicesArray);
+
+                return devicesArray.get(0).getAsJsonObject();
+            } else {
+                String errorMessage = response.body() != null ? response.body().string() : "无返回信息";
+                log.info("请求失败，状态码：" + response.code() + "，错误信息：" + errorMessage);
+            }
+        } catch (Exception e) {
+            log.info(e.toString());
+        }
+        return null;
     }
 }

@@ -20,6 +20,6 @@ class SmarthomeApplicationTests {
 
     @Test
     void contextLoads() {
-        System.out.println(iotService.getList());
+        System.out.println(iotService.getTop("客厅"));
     }
 }
