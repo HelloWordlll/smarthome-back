@@ -8,7 +8,11 @@ public class TopVO {
 
     private String devid;
 
+    private String devname;
+
     private String msg;
 
     private String msgdata;
+
+    private String type;
 }

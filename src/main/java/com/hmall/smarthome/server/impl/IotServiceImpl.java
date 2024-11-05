@@ -63,6 +63,8 @@ public class IotServiceImpl implements IotService {
             for(Rooms room1 : rooms){
                 TopVO topVO = new TopVO();
                 topVO.setDevid(room1.getDeviceId());
+                topVO.setDevname(room1.getDeviceName());
+                topVO.setType(room1.getType());
                 JsonObject json = getDeviceInfo(room1.getDeviceId());
                 JsonObject properties = json.getAsJsonObject("reported")
                         .getAsJsonObject("properties");
@@ -177,8 +179,6 @@ public class IotServiceImpl implements IotService {
                 String jsonData = response.body().string();
                 JsonObject jsonObject = gson.fromJson(jsonData, JsonObject.class);
                 JsonArray devicesArray = jsonObject.getAsJsonArray("shadow");
-                log.info("设备影子数据：" + devicesArray);
-
                 return devicesArray.get(0).getAsJsonObject();
             } else {
                 String errorMessage = response.body() != null ? response.body().string() : "无返回信息";
@@ -188,5 +188,39 @@ public class IotServiceImpl implements IotService {
             log.info(e.toString());
         }
         return null;
+    }
+    @Override
+    public boolean updateDevice(String deviceId, String msg, String msgdata) {
+        String url = "https://" + iotconfig.getEndpoint() + "/v5/iot/" + iotconfig.getProjectid() + "/devices/" + deviceId + "/commands";
+
+        JsonObject jsonObject = new JsonObject();
+// 添加 service_id 和 command_name
+        jsonObject.addProperty("service_id", "server");
+        jsonObject.addProperty("command_name", "SET");
+
+// 创建 JsonArray 并添加 msg 和 msgdata
+        JsonObject parasObject = new JsonObject();
+        parasObject.addProperty(msg, msgdata); // 这里的 "开" 是你希望设置的值
+
+// 将 paras JsonObject 添加到 jsonObject
+        jsonObject.add("paras", parasObject);
+        log.info("更新设备信息" + jsonObject.toString());
+
+        Request request = new Request.Builder()
+                .url(url)
+                .post(RequestBody.create(jsonObject.toString(), MediaType.get("application/json; charset=utf-8")))
+                .build();
+
+        try (Response response = client.newCall(request).execute()) {
+            if (response.isSuccessful()) {
+                return true;
+            } else {
+                String errorMessage = response.body() != null ? response.body().string() : "无返回信息";
+                log.info("请求失败，状态码：" + response.code() + "，错误信息：" + errorMessage);
+            }
+        } catch (Exception e) {
+            log.info(e.toString());
+        }
+        return false;
     }
 }

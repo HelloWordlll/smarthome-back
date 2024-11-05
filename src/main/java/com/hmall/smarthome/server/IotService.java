@@ -15,4 +15,6 @@ public interface IotService {
     String getToken();
 
     JsonObject getDeviceInfo(String deviceId);
+
+    boolean updateDevice(String deviceId, String msg, String msgdata);
 }

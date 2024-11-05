@@ -37,10 +37,13 @@ public class UserController {
     @PostMapping("/login")
     public BaseResponse login(@RequestBody UserVo uservo){
         if(!userService.login(uservo.getUsername(), uservo.getPassword())){
+            log.info("登录失败" + uservo);
             return BaseResponse.error("用户名或密码错误");
         }else {
-            System.out.println("登录成功");
+            log.info("登录成功");
         }
         return BaseResponse.success();
     }
+
+
 }
