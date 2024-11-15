@@ -15,4 +15,6 @@ public class TopVO {
     private String msgdata;
 
     private String type;
+
+    private String properties;
 }

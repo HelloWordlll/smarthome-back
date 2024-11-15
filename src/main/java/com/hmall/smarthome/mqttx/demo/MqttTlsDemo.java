@@ -8,7 +8,6 @@ import lombok.extern.slf4j.Slf4j;
 
 import static com.hmall.smarthome.mqttx.demo.MqttConstants.*;
 
-
 @Slf4j
 public class MqttTlsDemo {
     public static void main(String[] args) {

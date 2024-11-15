@@ -8,6 +8,10 @@ import com.google.gson.JsonParser;
 import com.hmall.smarthome.entry.pojo.Actions;
 import com.hmall.smarthome.entry.pojo.Conditions;
 import com.hmall.smarthome.entry.pojo.Rules;
+import com.hmall.smarthome.entry.vo.ActionVO;
+import com.hmall.smarthome.entry.vo.CondVO;
+import com.hmall.smarthome.entry.vo.RuleVO2;
+import com.hmall.smarthome.entry.vo.RuleVO3;
 import com.hmall.smarthome.mapper.ActionsMapper;
 import com.hmall.smarthome.mapper.ConditionsMapper;
 import com.hmall.smarthome.mapper.RulesMapper;
@@ -21,6 +25,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.awt.event.ActionEvent;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 
@@ -95,6 +100,46 @@ public boolean doRules(String msg) {
     }
 }
 
+    @Override
+    public boolean updata(RuleVO3 rulevo) {
+//        Integer id = rule.getCond().get(0).getId();
+        Rules rules = new Rules();
+//        rules.setRulesId(rulevo.getRule().getId());
+        rules.setRuleName(rulevo.getRule().getName());
+        rules.setOpen(rulevo.getRule().isOpen());
+        rules.setDeviceId(rulevo.getCond().get(0).getId());
+        rules.setDeviceName(rulevo.getCond().get(0).getName());
+        rules.setMsg(rulevo.getCond().get(0).getMsg());
+        rules.setMsgdata(rulevo.getCond().get(0).getMsgdata());
+
+        rulesMapper.delete(new QueryWrapper<Rules>().eq("rules_id", rulevo.getRule().getId()));
+        actionsMapper.delete(new QueryWrapper<Actions>().eq("rule_id", rulevo.getRule().getId()));
+
+        rulesMapper.insert(rules);
+        List<Actions> actions = new ArrayList<>();
+        for (ActionVO action : rulevo.getAction()) {
+            Actions actions1 = new Actions();
+            actions1.setDeviceId(action.getId());
+            actions1.setDeviceName(action.getName());
+            actions1.setMsg(action.getMsg());
+            actions1.setMsgdata(action.getMsgdata());
+            actions1.setRuleId(rules.getRulesId());
+            actions.add(actions1);
+        }
+
+        for (Actions action : actions) {
+            actionsMapper.insert(action);
+        }
+        return true;
+    }
+
+    @Override
+    public boolean deleteRules(Long id) {
+        rulesMapper.delete(new QueryWrapper<Rules>().eq("rules_id", id));
+        actionsMapper.delete(new QueryWrapper<Actions>().eq("rule_id", id));
+        return true;
+    }
+
     private void processProperties(JsonObject properties, List<Rules> devices) {
         if (properties != null) {
             log.info("--------设备信息：" + properties);
@@ -114,8 +159,21 @@ public boolean doRules(String msg) {
         }
     }
 
+    public RuleVO2 getRules2(Integer id){
 
-
+        List<Rules> rules = rulesMapper.selectList(new QueryWrapper<Rules>().eq("rules_id", id));
+        List<CondVO> conds = new ArrayList<>();
+        for (Rules rule : rules) {
+            conds.add(new CondVO(rule.getDeviceId(), rule.getDeviceName(), rule.getMsg(), rule.getMsgdata()));
+        }
+        List<Actions> actions = actionsMapper.selectList(new QueryWrapper<Actions>().eq("rule_id", id));
+        List<ActionVO> act = new ArrayList<>();
+        for (Actions action : actions) {
+            act.add(new ActionVO(action.getDeviceId(), action.getDeviceName(), action.getMsg(), action.getMsgdata()));
+        }
+        RuleVO2 ruleVO2 = new RuleVO2(conds, act);
+        return ruleVO2;
+    }
 
     public List<Rules> getRules() {
         return rulesMapper.selectList(null);

@@ -18,4 +18,7 @@ public class Actions {
     private String msg; // 对应 "msg"
     @TableField("msgdata")
     private String msgdata; // 对应 "msgdata"
+
+    @TableField("device_name")
+    private String deviceName; // 对应 "device_id"
 }

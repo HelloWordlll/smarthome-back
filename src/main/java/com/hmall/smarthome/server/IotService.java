@@ -17,4 +17,6 @@ public interface IotService {
     JsonObject getDeviceInfo(String deviceId);
 
     boolean updateDevice(String deviceId, String msg, String msgdata);
+
+    boolean set(String id, String paras);
 }

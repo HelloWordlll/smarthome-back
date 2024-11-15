@@ -26,6 +26,7 @@ import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 
 @Slf4j
 @Service
@@ -53,9 +54,60 @@ public class IotServiceImpl implements IotService {
     }
 
     @Override
+    public boolean set(String id, String paras) {
+        // 构建 URL
+        String url = "https://" + iotconfig.getEndpoint() + "/v5/iot/" + iotconfig.getProjectid() + "/devices/" + id + "/commands";
+        log.info("url: " + url);
+
+        // 创建请求体 (将 paras 转换为 JSON 字符串)
+        JsonObject requestBody = new JsonObject();
+        requestBody.addProperty("service_id", "server");
+        requestBody.addProperty("command_name", "SET");
+        requestBody.addProperty("paras", paras);
+
+        // 将请求体转换为 JSON 字符串
+        String jsonRequestBody = requestBody.toString();
+        log.info("jsonRequestBody: " + jsonRequestBody);
+
+        // 创建 OkHttpClient
+        OkHttpClient client = new OkHttpClient();
+
+        // 创建 RequestBody
+        RequestBody body = RequestBody.create(jsonRequestBody, MediaType.get("application/json; charset=utf-8"));
+
+        // 创建 Request
+        Request request = new Request.Builder()
+                .url(url)
+                .addHeader("X-Auth-Token", iotconfig.getToken()) // 确保添加 Authorization 头
+                .post(body)  // 设置 POST 请求
+                .build();
+
+        try {
+            // 发送请求
+            Response response = client.newCall(request).execute();
+
+            // 判断响应是否成功
+            if (response.isSuccessful()) {
+                // 请求成功，返回 true
+                return true;
+            } else {
+                // 请求失败，打印响应内容
+                System.out.println("Error response: " + response.body().string());
+                return false;
+            }
+        } catch (Exception e) {
+            // 异常处理
+            e.printStackTrace();
+            return false;
+        }
+    }
+
+    @Override
     public List<TopVO> getTop(String room) {
         QueryWrapper<Rooms> queryWrapper = new QueryWrapper<>();
-        queryWrapper.eq("room_name",room);
+        if (!Objects.equals(room, "all")) {
+            queryWrapper.eq("room_name",room);
+        }
         List<Rooms> rooms = roomsMapper.selectList(queryWrapper);
 
         if(!rooms.isEmpty()){
@@ -76,6 +128,7 @@ public class IotServiceImpl implements IotService {
                     }
                 }
 
+                topVO.setProperties(properties.toString());
                 topVOS.add(topVO);
             }
             return topVOS;
@@ -162,14 +215,13 @@ public class IotServiceImpl implements IotService {
         } catch (IOException e) {
             log.info("请求异常: " + e.toString());
         }
-
         return token;
     }
 
     @Override
     public JsonObject getDeviceInfo(String deviceId) {
         String url = "https://" + iotconfig.getEndpoint() + "/v5/iot/" + iotconfig.getProjectid() + "/devices/" + deviceId + "/shadow";
-        log.info(url);
+//        log.info(url);
 
         Request request = new Request.Builder()
                 .url(url)
